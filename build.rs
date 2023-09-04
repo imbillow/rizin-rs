@@ -14,6 +14,8 @@ fn main() -> Result<(), String> {
     }
 
     println!("cargo:rustc-link-lib=rz_bin");
+    println!("cargo:rustc-link-lib=rz_util");
+    println!("cargo:rustc-link-lib=rz_io");
     println!("cargo:rustc-link-search=native={}",
              out_dir.join("usr").join("local").join("lib").to_str().unwrap());
     println!("cargo:rerun-if-changed=wrapper.h");
@@ -26,6 +28,7 @@ fn main() -> Result<(), String> {
             "-I", out_dir.join("usr").join("local").join("include").join("librz").join("sdb").to_str().unwrap(),
             "-I", "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/"
         ])
+        .derive_default(true)
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
         .generate()
         .expect("Unable to generate bindings");
