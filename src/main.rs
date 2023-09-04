@@ -10,7 +10,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let mut rz_bin_opt = RzBinOptions::default();
         rz_bin_options_init(&mut rz_bin_opt, 0, 0, 0, false);
 
-        let path = CString::new("llvmcache-3941033427625318476.debug_abbrev")?;
+        let path = CString::new("../rizin/llvmcache-3941033427625318476")?;
         rz_bin_open(rz_bin, path.as_ptr(), &mut rz_bin_opt);
 
         let dw_opt = RzBinDWARFOption { line_mask: 0, flags: RzBinDWARFFlags_RZ_BIN_DWARF_ALL };
