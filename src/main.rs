@@ -1,6 +1,6 @@
 use std::error::Error;
 use std::ffi::*;
-use rz_fuzz::*;
+use rizin_rs::*;
 
 fn main() -> Result<(), Box<dyn Error>> {
     unsafe {
