@@ -5,35 +5,44 @@ use std::process::Command;
 fn main() -> Result<(), String> {
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     let build_dir = out_dir.join("build");
-    meson::build("rizin", build_dir.to_str().unwrap());
-    let status = Command::new("meson")
-        .current_dir(build_dir).args(["install", "--destdir", out_dir.to_str().unwrap()])
-        .status().expect("cannot run command");
-    if !status.success() {
-        return Err("meson install failed".to_string());
-    }
+    let prefix_dir = out_dir.join("prefix");
+
+    let profile = env::var("PROFILE").unwrap();
+    assert!(Command::new("meson")
+        .current_dir("rizin")
+        .args(["setup",
+            "--buildtype", profile.as_str(),
+            "--prefix", prefix_dir.to_str().unwrap(),
+            build_dir.to_str().unwrap()])
+        .status().expect("failed to setup")
+        .success());
+    assert!(Command::new("meson")
+        .current_dir(build_dir)
+        .args(["install"])
+        .status().expect("cannot run command")
+        .success());
 
     println!("cargo:rustc-link-lib=rz_bin");
     println!("cargo:rustc-link-lib=rz_util");
     println!("cargo:rustc-link-lib=rz_io");
     println!("cargo:rustc-link-search=native={}",
-             out_dir.join("usr").join("local").join("lib").to_str().unwrap());
+             prefix_dir.join("lib").to_str().unwrap());
     println!("cargo:rerun-if-changed=wrapper.h");
 
     let bindings = bindgen::Builder::default()
         .header("wrapper.h")
         .clang_args([
-            "-I", out_dir.join("usr").join("local").join("include").to_str().unwrap(),
-            "-I", out_dir.join("usr").join("local").join("include").join("librz").to_str().unwrap(),
-            "-I", out_dir.join("usr").join("local").join("include").join("librz").join("sdb").to_str().unwrap(),
+            "-I", prefix_dir.join("include").to_str().unwrap(),
+            "-I", prefix_dir.join("include").join("librz").to_str().unwrap(),
+            "-I", prefix_dir.join("include").join("librz").join("sdb").to_str().unwrap(),
             "-I", "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/"
         ])
         .derive_default(true)
         .blocklist_type("u128")
         .blocklist_type("max_align_t")
         .blocklist_function("_.*")
-        .blocklist_function("rz.*128.*")
-        .blocklist_function("rz_float_.*_from_f80")
+        // .blocklist_function("rz.*128.*")
+        // .blocklist_function("rz_float_.*_from_f80")
         .blocklist_function("wcstold")
         // Blacklist functions with u128 in signature.
         // https://github.com/zmwangx/rust-ffmpeg-sys/issues/1
