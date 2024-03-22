@@ -9,7 +9,7 @@
 //         if buf.is_null() {
 //             return Err(());
 //         }
-//         let abbrev = rz_bin_dwarf_abbrev_from_buf(buf);
+//         let abbrev = rz_bin _dwarf_abbrev_from_buf(buf);
 //         if abbrev.is_null() {
 //             return Err(());
 //         }

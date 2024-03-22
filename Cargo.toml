@@ -7,7 +7,8 @@ edition = "2021"
 
 [dependencies]
 arbitrary = { version = "1", features = ["derive"] }
+bindgen = "0.69.4"
 
 [build-dependencies]
-bindgen = { git = "https://github.com/rust-lang/rust-bindgen.git", branch = "main" }
+#bindgen = { git = "https://github.com/rust-lang/rust-bindgen.git", branch = "main" }
 
