@@ -1,6 +1,52 @@
+use std::collections::HashSet;
 use std::env;
 use std::path::PathBuf;
 use std::process::Command;
+use bindgen::callbacks::{MacroParsingBehavior, ParseCallbacks};
+
+const IGNORE_MACROS
+: [&str; 20] = [
+    "FE_DIVBYZERO",
+    "FE_DOWNWARD",
+    "FE_INEXACT",
+    "FE_INVALID",
+    "FE_OVERFLOW",
+    "FE_TONEAREST",
+    "FE_TOWARDZERO",
+    "FE_UNDERFLOW",
+    "FE_UPWARD",
+    "FP_INFINITE",
+    "FP_INT_DOWNWARD",
+    "FP_INT_TONEAREST",
+    "FP_INT_TONEARESTFROMZERO",
+    "FP_INT_TOWARDZERO",
+    "FP_INT_UPWARD",
+    "FP_NAN",
+    "FP_NORMAL",
+    "FP_SUBNORMAL",
+    "FP_ZERO",
+    "IPPORT_RESERVED",
+];
+
+#[derive(Debug)]
+struct IgnoreMacros(HashSet<String>);
+
+impl ParseCallbacks for IgnoreMacros {
+    fn will_parse_macro(&self, name: &str) -> MacroParsingBehavior {
+        if self.0.contains(name) {
+            MacroParsingBehavior::Ignore
+        } else {
+            MacroParsingBehavior::Default
+        }
+    }
+}
+
+impl IgnoreMacros {
+    fn new() -> Self {
+        Self(IGNORE_MACROS
+            .into_iter().map(|s| s.to_owned()).collect())
+    }
+}
 
 fn main() -> Result<(), String> {
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
@@ -26,7 +72,7 @@ fn main() -> Result<(), String> {
     println!("cargo:rustc-link-lib=rz_util");
     println!("cargo:rustc-link-lib=rz_io");
     println!("cargo:rustc-link-search=native={}",
-             prefix_dir.join("lib").to_str().unwrap());
+             prefix_dir.join("lib64").to_str().unwrap());
     println!("cargo:rerun-if-changed=wrapper.h");
 
     let bindings = bindgen::Builder::default()
@@ -128,7 +174,7 @@ fn main() -> Result<(), String> {
         .blocklist_function("y0l")
         .blocklist_function("y1l")
         .blocklist_function("ynl")
-        .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+        .parse_callbacks(Box::new(IgnoreMacros::new()))
         .generate()
         .expect("Unable to generate bindings");
 
