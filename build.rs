@@ -1,11 +1,10 @@
+use bindgen::callbacks::{MacroParsingBehavior, ParseCallbacks};
 use std::collections::HashSet;
 use std::env;
+use std::error::Error;
 use std::path::PathBuf;
-use std::process::Command;
-use bindgen::callbacks::{MacroParsingBehavior, ParseCallbacks};
 
-const IGNORE_MACROS
-: [&str; 20] = [
+const IGNORE_MACROS: [&str; 20] = [
     "FE_DIVBYZERO",
     "FE_DOWNWARD",
     "FE_INEXACT",
@@ -43,45 +42,36 @@ impl ParseCallbacks for IgnoreMacros {
 
 impl IgnoreMacros {
     fn new() -> Self {
-        Self(IGNORE_MACROS
-            .into_iter().map(|s| s.to_owned()).collect())
+        Self(IGNORE_MACROS.into_iter().map(|s| s.to_owned()).collect())
     }
 }
 
-fn main() -> Result<(), String> {
+const RZ_LIBRARIES: &[&str] = &["rz_bin", "rz_util", "rz_io"];
+
+fn main() -> Result<(), Box<dyn Error>> {
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
-    let build_dir = out_dir.join("build");
-    let prefix_dir = out_dir.join("prefix");
 
-    let profile = env::var("PROFILE").unwrap();
-    assert!(Command::new("meson")
-        .current_dir("rizin")
-        .args(["setup",
-            "--buildtype", profile.as_str(),
-            "--prefix", prefix_dir.to_str().unwrap(),
-            build_dir.to_str().unwrap()])
-        .status().expect("failed to setup")
-        .success());
-    assert!(Command::new("meson")
-        .current_dir(build_dir)
-        .args(["install"])
-        .status().expect("cannot run command")
-        .success());
+    for lib in RZ_LIBRARIES {
+        println!("cargo:rustc-link-lib=dylib={}", lib);
+    }
 
-    println!("cargo:rustc-link-lib=rz_bin");
-    println!("cargo:rustc-link-lib=rz_util");
-    println!("cargo:rustc-link-lib=rz_io");
-    println!("cargo:rustc-link-search=native={}",
-             prefix_dir.join("lib64").to_str().unwrap());
+    let rizin_dir = PathBuf::from(env::var("HOME")?).join(".local");
+    let lib_dir = rizin_dir.join("lib64");
+    println!("cargo:rustc-link-search={}", lib_dir.to_str().unwrap());
     println!("cargo:rerun-if-changed=wrapper.h");
 
+    let inc_dir = rizin_dir.join("include");
     let bindings = bindgen::Builder::default()
         .header("wrapper.h")
         .clang_args([
-            "-I", prefix_dir.join("include").to_str().unwrap(),
-            "-I", prefix_dir.join("include").join("librz").to_str().unwrap(),
-            "-I", prefix_dir.join("include").join("librz").join("sdb").to_str().unwrap(),
-            "-I", "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/"
+            "-I",
+            inc_dir.to_str().unwrap(),
+            "-I",
+            inc_dir.join("librz").to_str().unwrap(),
+            "-I",
+            inc_dir.join("librz").join("sdb").to_str().unwrap(),
+            "-I",
+            "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/",
         ])
         .derive_default(true)
         .blocklist_type("u128")
@@ -178,7 +168,7 @@ fn main() -> Result<(), String> {
         .generate()
         .expect("Unable to generate bindings");
 
-// Write the bindings to the $OUT_DIR/bindings.rs file.
+    // Write the bindings to the $OUT_DIR/bindings.rs file.
     bindings
         .write_to_file(out_dir.join("bindings.rs"))
         .expect("Couldn't write bindings!");

@@ -13,3 +13,9 @@ arbitrary = { version = "1", features = ["derive"] }
 [build-dependencies]
 # bindgen = "0.69.4"
 bindgen = { git = "https://github.com/rust-lang/rust-bindgen.git", branch = "main" }
+
+[profile.dev]
+rpath = true
+
+[lib]
+doctest = false

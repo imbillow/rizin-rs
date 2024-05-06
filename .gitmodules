@@ -1,4 +1,0 @@
-[submodule "rizin"]
-	path = rizin
-	url = https://github.com/rizinorg/rizin.git
-	branch = dev
