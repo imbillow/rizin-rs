@@ -5,16 +5,14 @@
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 pub mod wrapper;
 
-
 #[cfg(test)]
 mod tests {
+    use crate::*;
     use std::ffi::CString;
     use std::path::Path;
-    use crate::*;
 
     #[test]
     fn test_bin_file() {
-        assert!(true);
         unsafe {
             let rz_bin = rz_bin_new();
             let io = rz_io_new();

@@ -1,22 +1,88 @@
-// use std::ffi::c_ulonglong;
-// use std::ptr::null_mut;
-// use arbitrary::{Arbitrary, Unstructured, Error};
-// use crate::*;
-//
-// pub fn abbrev(input: &[u8]) -> Result<RzBinDwarfAbbrev, ()> {
-//     unsafe {
-//         let buf = rz_buf_new_with_bytes(input.as_ptr(), input.len() as c_ulonglong);
-//         if buf.is_null() {
-//             return Err(());
-//         }
-//         let abbrev = rz_bin _dwarf_abbrev_from_buf(buf);
-//         if abbrev.is_null() {
-//             return Err(());
-//         }
-//         Ok(*abbrev)
-//     }
-// }
-//
+use std::ffi::CString;
+use std::mem::size_of;
+use std::path::PathBuf;
+use std::ptr;
+use std::ptr::null_mut;
+
+use crate::*;
+
+pub struct BinFile {
+    bin: *mut RzBin,
+    bf: *mut RzBinFile,
+}
+
+impl BinFile {
+    unsafe fn open(bin: *mut RzBin, path: PathBuf) -> Result<BinFile, ()> {
+        let mut rz_bin_opt = RzBinOptions::default();
+        rz_bin_options_init(&mut rz_bin_opt, 0, 0, 0, false);
+        let cpath = CString::new(path.to_str().unwrap()).unwrap();
+        let bf = rz_bin_open(bin, cpath.as_ptr(), &mut rz_bin_opt);
+        if bf.is_null() {
+            Err(())
+        } else {
+            Ok(BinFile { bin, bf })
+        }
+    }
+}
+
+impl Drop for BinFile {
+    fn drop(&mut self) {
+        unsafe {
+            rz_bin_file_delete(self.bin, self.bf);
+        }
+    }
+}
+
+unsafe fn endian_reader_new(bf: *mut RzBinFile, sect: &str) -> Result<Box<RzBinEndianReader>, ()> {
+    let sectc = CString::new(sect).map_err(|_| ())?;
+    let b = rz_bin_dwarf_endian_reader_by_section_name(bf, sectc.into_raw());
+    Ok(Box::from_raw(b))
+}
+
+impl RzBinEndianReader {
+    fn new(input: &[u8], big_endian: bool) -> Self {
+        Self {
+            data: input.as_ptr() as _,
+            owned: false,
+            length: input.len() as _,
+            offset: 0,
+            big_endian,
+            relocations: null_mut(),
+        }
+    }
+}
+
+pub struct DwarfAbbrev {
+    inner: *mut RzBinDwarfAbbrev,
+}
+
+impl DwarfAbbrev {
+    pub fn new(input: &[u8]) -> Result<DwarfAbbrev, ()> {
+        unsafe {
+            let R = RzBinEndianReader::new(input, false);
+            let Rc = rz_mem_alloc(size_of::<RzBinEndianReader>());
+            memcpy(
+                Rc,
+                ptr::addr_of!(R) as _,
+                size_of::<RzBinEndianReader>() as _,
+            );
+            let abbrev = rz_bin_dwarf_abbrev_new(Rc as _);
+            if abbrev.is_null() {
+                return Err(());
+            }
+            Ok(DwarfAbbrev { inner: abbrev })
+        }
+    }
+}
+
+impl Drop for DwarfAbbrev {
+    fn drop(&mut self) {
+        unsafe {
+            rz_bin_dwarf_abbrev_free(self.inner);
+        }
+    }
+}
+
 // pub fn aranges(input: &[u8], big_endian: bool) -> Result<RzBinDwarfARanges, ()> {
 //     unsafe {
 //         let buf = rz_buf_new_with_bytes(input.as_ptr(), input.len() as c_ulonglong);
@@ -72,7 +138,7 @@
 //         Ok(*x)
 //     }
 // }
-//
+
 // #[derive(Debug, Default, Clone)]
 // pub struct InfoInput {
 //     pub info: Vec<u8>,
