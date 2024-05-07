@@ -1,8 +1,7 @@
-use std::cmp::min;
+use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
-use chashmap::CHashMap;
 use hex::ToHex;
 
 use rizin_rs::wrapper::Core;
@@ -49,45 +48,39 @@ impl Display for Instruction {
 
 fn main() -> Result<(), Box<dyn Error>> {
     const INST_LIMIT: usize = 0x8_usize;
-    const MAX: u32 = u32::MAX;
-    let map = CHashMap::<String, usize>::new();
-    let n = MAX / (rayon::current_num_threads() as u32);
+    const MAX: u32 = u32::MAX as _;
+    let mut map = HashMap::<String, usize>::new();
 
-    let pool = rayon::ThreadPoolBuilder::new().build()?;
-    pool.spawn_broadcast(move |ctx| {
-        let core = Core::new();
-        core.set("analysis.arch", "pic").unwrap();
-        core.set("analysis.cpu", "pic18").unwrap();
-        let addrs = vec![0, 0xff00];
-        let begin: u32 = (ctx.index() as u32) * n;
+    let core = Core::new();
+    core.set("analysis.arch", "pic").unwrap();
+    core.set("analysis.cpu", "pic18").unwrap();
+    let addrs = vec![0, 0xff00];
 
-        for x in begin..min(begin + n, MAX) {
-            let b: [u8; 4] = x.to_le_bytes();
-            for addr in addrs.clone() {
-                let inst = Instruction::from_bytes(&core, &b, addr);
-                if inst.is_err() {
+    for x in 0..MAX {
+        let b: [u8; 4] = x.to_le_bytes();
+        for addr in addrs.clone() {
+            let inst = Instruction::from_bytes(&core, &b, addr);
+            if inst.is_err() {
+                continue;
+            }
+            let inst = inst.unwrap();
+            match map.get(&inst.inst) {
+                Some(x) if *x > INST_LIMIT => {
                     continue;
                 }
-                let inst = inst.unwrap();
-                match map.get(&inst.inst) {
-                    Some(x) if *x > INST_LIMIT => {
-                        continue;
-                    }
-                    _ => {}
-                }
+                _ => {}
+            }
 
-                println!("{}", inst);
-                match map.get_mut(&inst.inst) {
-                    None => {
-                        map.insert_new(inst.inst, 1);
-                    }
-                    Some(mut k) => {
-                        *k += 1;
-                    }
+            println!("{}", inst);
+            match map.get_mut(&inst.inst) {
+                None => {
+                    map.insert(inst.inst, 1);
+                }
+                Some(k) => {
+                    *k += 1;
                 }
             }
         }
-    });
-    pool.broadcast(|_| {});
+    }
     Ok(())
 }
