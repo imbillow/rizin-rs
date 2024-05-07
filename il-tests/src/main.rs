@@ -2,7 +2,8 @@ use std::cmp::min;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
-use hex_slice::AsHex;
+use chashmap::CHashMap;
+use hex::ToHex;
 
 use rizin_rs::wrapper::Core;
 
@@ -38,8 +39,8 @@ impl Display for Instruction {
         }
         write!(
             f,
-            "{:x} {:#08x} {}",
-            self.bytes.plain_hex(false),
+            "{} {:#08x} {}",
+            self.bytes.encode_hex::<String>(),
             self.addr,
             self.il
         )
@@ -47,7 +48,8 @@ impl Display for Instruction {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    // const INST_LIMIT: usize = 0x8_usize;
+    const INST_LIMIT: usize = 0x8_usize;
+    let map = CHashMap::<String, usize>::new();
     let n = u32::MAX / (rayon::current_num_threads() as u32);
 
     let pool = rayon::ThreadPoolBuilder::new().build()?;
@@ -58,14 +60,32 @@ fn main() -> Result<(), Box<dyn Error>> {
         let addrs = vec![0, 0xff00];
         let begin: u32 = (ctx.index() as u32) * n;
 
-        (begin..min(begin + n, u32::MAX)).for_each(|x| {
+        for x in begin..min(begin + n, u32::MAX) {
             let b: [u8; 4] = x.to_le_bytes();
             for addr in addrs.clone() {
-                if let Ok(inst) = Instruction::from_bytes(&core, &b, addr) {
-                    println!("{}", inst);
+                let inst = Instruction::from_bytes(&core, &b, addr);
+                if inst.is_err() {
+                    continue;
+                }
+                let inst = inst.unwrap();
+                {
+                    if let Some(x) = map.get(&inst.inst) {
+                        if *x > INST_LIMIT {
+                            continue;
+                        }
+                    }
+                }
+                println!("{}", inst);
+                match map.get_mut(&inst.inst) {
+                    None => {
+                        map.insert_new(inst.inst, 1);
+                    }
+                    Some(mut k) => {
+                        *k += 1;
+                    }
                 }
             }
-        });
+        }
     });
     pool.broadcast(|_| {});
     Ok(())
