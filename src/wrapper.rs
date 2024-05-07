@@ -1,8 +1,9 @@
-use std::ffi::{CStr, CString, NulError};
+use std::ffi::{CStr, CString};
+use std::fmt;
+use std::fmt::Display;
 use std::mem::size_of;
 use std::path::PathBuf;
-use std::ptr;
-use std::ptr::null_mut;
+use std::ptr::{addr_of, addr_of_mut, null_mut};
 
 use crate::*;
 
@@ -21,14 +22,56 @@ pub struct AnalysisOp(pub RzAnalysisOp);
 impl Drop for AnalysisOp {
     fn drop(&mut self) {
         unsafe {
-            rz_analysis_op_fini(ptr::addr_of_mut!(self.0));
+            rz_analysis_op_fini(addr_of_mut!(self.0));
+        }
+    }
+}
+
+pub struct StrBuf(RzStrBuf);
+
+impl StrBuf {
+    pub fn new() -> Self {
+        let mut sb = RzStrBuf::default();
+        unsafe { rz_strbuf_init(addr_of_mut!(sb)) };
+        Self(sb)
+    }
+}
+
+impl Display for StrBuf {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let cstr = unsafe {
+            let ptr = rz_strbuf_drain_nofree(addr_of!(self.0) as _);
+            CStr::from_ptr(ptr)
+        };
+        let str = cstr.to_str().map_err(|_| fmt::Error)?;
+        f.write_str(str)
+    }
+}
+
+impl Drop for StrBuf {
+    fn drop(&mut self) {
+        unsafe {
+            rz_strbuf_fini(addr_of_mut!(self.0));
         }
     }
 }
 
 impl AnalysisOp {
-    pub fn mnemonic(&self) -> &CStr {
-        unsafe { CStr::from_ptr(self.0.mnemonic) }
+    pub fn mnemonic(&self) -> Result<&str, ()> {
+        let cstr = unsafe { CStr::from_ptr(self.0.mnemonic) };
+        cstr.to_str().map_err(|_| ())
+    }
+
+    pub fn il_str(&self, pretty: bool) -> Result<String, ()> {
+        if self.0.il_op.is_null() {
+            Err(())
+        } else {
+            let mut sb = StrBuf::new();
+            unsafe {
+                rz_il_op_effect_stringify(self.0.il_op, addr_of_mut!(sb.0), pretty);
+            }
+            Ok(sb.to_string())
+        }
     }
 }
 
@@ -42,7 +85,7 @@ impl Core {
         let res = unsafe {
             rz_analysis_op(
                 self.0.analysis,
-                ptr::addr_of_mut!(op),
+                addr_of_mut!(op),
                 addr as _,
                 bytes.as_ptr() as _,
                 bytes.len() as _,
@@ -57,15 +100,19 @@ impl Core {
         }
     }
 
-    pub fn set(&self, k: &str, v: &str) -> Result<(), NulError> {
-        unsafe {
+    pub fn set(&self, k: &str, v: &str) -> Result<(), ()> {
+        let node = unsafe {
             rz_config_set(
                 self.0.config,
-                CString::new(k)?.as_ptr(),
-                CString::new(v)?.as_ptr(),
-            );
+                CString::new(k).map_err(|_| ())?.as_ptr(),
+                CString::new(v).map_err(|_| ())?.as_ptr(),
+            )
+        };
+        if node.is_null() {
+            Err(())
+        } else {
+            Ok(())
         }
-        Ok(())
     }
 }
 
@@ -118,7 +165,7 @@ impl DwarfAbbrev {
             let Rc = rz_mem_alloc(size_of::<RzBinEndianReader>());
             memcpy(
                 Rc,
-                ptr::addr_of!(R) as _,
+                addr_of!(R) as _,
                 size_of::<RzBinEndianReader>() as _,
             );
             let abbrev = rz_bin_dwarf_abbrev_new(Rc as _);

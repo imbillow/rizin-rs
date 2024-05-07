@@ -46,7 +46,15 @@ impl IgnoreMacros {
     }
 }
 
-const RZ_LIBRARIES: &[&str] = &["rz_core", "rz_arch", "rz_bin", "rz_util", "rz_io"];
+const RZ_LIBRARIES: &[&str] = &[
+    "rz_core",
+    "rz_config",
+    "rz_arch",
+    "rz_bin",
+    "rz_util",
+    "rz_io",
+    "rz_il",
+];
 
 fn main() -> Result<(), Box<dyn Error>> {
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
