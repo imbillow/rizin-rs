@@ -1,10 +1,9 @@
-use std::collections::HashMap;
+use std::cmp::min;
+use std::error::Error;
 use std::fmt::{Display, Formatter};
-use std::sync::Mutex;
 
 use hex_slice::AsHex;
 
-use rayon::prelude::*;
 use rizin_rs::wrapper::Core;
 
 struct Instruction {
@@ -47,38 +46,27 @@ impl Display for Instruction {
     }
 }
 
-fn main() -> Result<(), ()> {
-    let addrs = vec![0, 0xff00];
-    let insts = Mutex::new(HashMap::<String, usize>::new());
-    const INST_LIMIT: usize = 0x8_usize;
+fn main() -> Result<(), Box<dyn Error>> {
+    // const INST_LIMIT: usize = 0x8_usize;
+    let n = u32::MAX / (rayon::current_num_threads() as u32);
 
-    let core = Mutex::new(Core::new());
-    {
-        let co = core.lock().unwrap();
-        co.set("analysis.arch", "pic").unwrap();
-        co.set("analysis.cpu", "pic18").unwrap();
-    }
+    let pool = rayon::ThreadPoolBuilder::new().build()?;
+    pool.spawn_broadcast(move |ctx| {
+        let core = Core::new();
+        core.set("analysis.arch", "pic").unwrap();
+        core.set("analysis.cpu", "pic18").unwrap();
+        let addrs = vec![0, 0xff00];
+        let begin: u32 = (ctx.index() as u32) * n;
 
-    (0x1000_u32..u32::MAX).into_par_iter().for_each(|x| {
-        let core = core.lock().unwrap();
-        let b: [u8; 4] = x.to_le_bytes();
-        for addr in addrs.clone() {
-            if let Ok(inst) = Instruction::from_bytes(&core, &b, addr) {
-                let mut insts = insts.lock().unwrap();
-                match insts.get_mut(&inst.inst) {
-                    Some(k) if *k > INST_LIMIT => continue,
-                    Some(k) => {
-                        println!("{}", inst);
-                        *k += 1;
-                    }
-                    None => {
-                        println!("{}", inst);
-                        insts.insert(inst.inst, 1);
-                    }
+        (begin..min(begin + n, u32::MAX)).for_each(|x| {
+            let b: [u8; 4] = x.to_le_bytes();
+            for addr in addrs.clone() {
+                if let Ok(inst) = Instruction::from_bytes(&core, &b, addr) {
+                    println!("{}", inst);
                 }
             }
-        }
+        });
     });
-
+    pool.broadcast(|_| {});
     Ok(())
 }

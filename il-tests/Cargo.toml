@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+chashmap = "2.2.2"
 hex-slice = "0.1.4"
 rayon = "1.10.0"
 
