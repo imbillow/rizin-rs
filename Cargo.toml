@@ -16,3 +16,8 @@ rpath = true
 
 [lib]
 doctest = false
+
+[workspace]
+members = [
+    "il-tests"
+]

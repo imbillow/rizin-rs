@@ -58,8 +58,12 @@ impl Drop for StrBuf {
 
 impl AnalysisOp {
     pub fn mnemonic(&self) -> Result<&str, ()> {
-        let cstr = unsafe { CStr::from_ptr(self.0.mnemonic) };
-        cstr.to_str().map_err(|_| ())
+        if self.0.mnemonic.is_null() {
+            Err(())
+        } else {
+            let cstr = unsafe { CStr::from_ptr(self.0.mnemonic) };
+            cstr.to_str().map_err(|_| ())
+        }
     }
 
     pub fn il_str(&self, pretty: bool) -> Result<String, ()> {
@@ -163,11 +167,7 @@ impl DwarfAbbrev {
         unsafe {
             let R = RzBinEndianReader::new(input, false);
             let Rc = rz_mem_alloc(size_of::<RzBinEndianReader>());
-            memcpy(
-                Rc,
-                addr_of!(R) as _,
-                size_of::<RzBinEndianReader>() as _,
-            );
+            memcpy(Rc, addr_of!(R) as _, size_of::<RzBinEndianReader>() as _);
             let abbrev = rz_bin_dwarf_abbrev_new(Rc as _);
             if abbrev.is_null() {
                 return Err(());
