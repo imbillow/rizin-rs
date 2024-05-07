@@ -33,12 +33,6 @@ impl Drop for BinFile {
     }
 }
 
-unsafe fn endian_reader_new(bf: *mut RzBinFile, sect: &str) -> Result<Box<RzBinEndianReader>, ()> {
-    let sectc = CString::new(sect).map_err(|_| ())?;
-    let b = rz_bin_dwarf_endian_reader_by_section_name(bf, sectc.into_raw());
-    Ok(Box::from_raw(b))
-}
-
 impl RzBinEndianReader {
     fn new(input: &[u8], big_endian: bool) -> Self {
         Self {
