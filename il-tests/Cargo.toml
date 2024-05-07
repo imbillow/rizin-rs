@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 hex-slice = "0.1.4"
+rayon = "1.10.0"
 
 [dependencies.rizin-rs]
 path = ".."

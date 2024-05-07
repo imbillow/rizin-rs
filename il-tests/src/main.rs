@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
+use std::sync::Mutex;
 
 use hex_slice::AsHex;
 
+use rayon::prelude::*;
 use rizin_rs::wrapper::Core;
 
 struct Instruction {
@@ -46,17 +48,23 @@ impl Display for Instruction {
 }
 
 fn main() -> Result<(), ()> {
-    let core = Core::new();
-    core.set("analysis.arch", "pic")?;
-    core.set("analysis.cpu", "pic18")?;
     let addrs = vec![0, 0xff00];
-    let mut insts = HashMap::<String, usize>::new();
+    let insts = Mutex::new(HashMap::<String, usize>::new());
     const INST_LIMIT: usize = 0x8_usize;
 
-    for x in 0x1000_u32..0xffff_u32 {
+    let core = Mutex::new(Core::new());
+    {
+        let co = core.lock().unwrap();
+        co.set("analysis.arch", "pic").unwrap();
+        co.set("analysis.cpu", "pic18").unwrap();
+    }
+
+    (0x1000_u32..u32::MAX).into_par_iter().for_each(|x| {
+        let core = core.lock().unwrap();
         let b: [u8; 4] = x.to_le_bytes();
         for addr in addrs.clone() {
             if let Ok(inst) = Instruction::from_bytes(&core, &b, addr) {
+                let mut insts = insts.lock().unwrap();
                 match insts.get_mut(&inst.inst) {
                     Some(k) if *k > INST_LIMIT => continue,
                     Some(k) => {
@@ -70,6 +78,7 @@ fn main() -> Result<(), ()> {
                 }
             }
         }
-    }
+    });
+
     Ok(())
 }
