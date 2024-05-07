@@ -46,7 +46,7 @@ impl IgnoreMacros {
     }
 }
 
-const RZ_LIBRARIES: &[&str] = &["rz_bin", "rz_util", "rz_io"];
+const RZ_LIBRARIES: &[&str] = &["rz_core", "rz_bin", "rz_util", "rz_io"];
 
 fn main() -> Result<(), Box<dyn Error>> {
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
@@ -57,7 +57,14 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let rizin_dir = PathBuf::from(env::var("HOME")?).join(".local");
     let lib_dir = rizin_dir.join("lib64");
-    println!("cargo:rustc-link-search={}", lib_dir.to_str().unwrap());
+    if lib_dir.exists() {
+        println!("cargo:rustc-link-search={}", lib_dir.to_str().unwrap());
+    }
+    let lib_dir = rizin_dir.join("lib");
+    if lib_dir.exists() {
+        println!("cargo:rustc-link-search={}", lib_dir.to_str().unwrap());
+    }
+
     println!("cargo:rerun-if-changed=wrapper.h");
 
     let inc_dir = rizin_dir.join("include");

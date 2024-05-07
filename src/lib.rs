@@ -8,6 +8,7 @@ pub mod wrapper;
 
 #[cfg(test)]
 mod tests {
+    use crate::wrapper::Core;
     use crate::*;
     use std::ffi::CString;
     use std::path::Path;
@@ -29,6 +30,11 @@ mod tests {
                 assert!(!bf.is_null());
             }
         }
+    }
+
+    #[test]
+    fn test_core() {
+        let _ = Core::new();
     }
 
     #[test]

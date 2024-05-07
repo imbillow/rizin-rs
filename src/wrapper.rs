@@ -6,29 +6,46 @@ use std::ptr::null_mut;
 
 use crate::*;
 
-pub struct BinFile {
-    bin: *mut RzBin,
-    bf: *mut RzBinFile,
+pub struct Core(pub Box<RzCore>);
+
+impl Core {
+    pub fn new() -> Self {
+        unsafe { Self(Box::from_raw(rz_core_new())) }
+    }
 }
 
-impl BinFile {
-    unsafe fn open(bin: *mut RzBin, path: PathBuf) -> Result<BinFile, ()> {
-        let mut rz_bin_opt = RzBinOptions::default();
-        rz_bin_options_init(&mut rz_bin_opt, 0, 0, 0, false);
-        let cpath = CString::new(path.to_str().unwrap()).unwrap();
-        let bf = rz_bin_open(bin, cpath.as_ptr(), &mut rz_bin_opt);
-        if bf.is_null() {
-            Err(())
-        } else {
-            Ok(BinFile { bin, bf })
+impl Drop for Core {
+    fn drop(&mut self) {
+        let ptr = Box::into_raw(self.0.clone());
+        unsafe {
+            rz_core_free(ptr);
         }
     }
 }
 
-impl Drop for BinFile {
+pub struct BinFile<'a> {
+    core: &'a Core,
+    pub bf: *mut RzBinFile,
+}
+
+impl Core {
+    unsafe fn open(&mut self, path: PathBuf) -> Result<BinFile, ()> {
+        let mut rz_bin_opt = RzBinOptions::default();
+        rz_bin_options_init(&mut rz_bin_opt, 0, 0, 0, false);
+        let cpath = CString::new(path.to_str().unwrap()).unwrap();
+        let bf = rz_bin_open(self.0.bin, cpath.as_ptr(), &mut rz_bin_opt);
+        if bf.is_null() {
+            Err(())
+        } else {
+            Ok(BinFile { core: self, bf })
+        }
+    }
+}
+
+impl Drop for BinFile<'_> {
     fn drop(&mut self) {
         unsafe {
-            rz_bin_file_delete(self.bin, self.bf);
+            rz_bin_file_delete(self.core.0.bin, self.bf);
         }
     }
 }
@@ -46,9 +63,7 @@ impl RzBinEndianReader {
     }
 }
 
-pub struct DwarfAbbrev {
-    inner: *mut RzBinDwarfAbbrev,
-}
+pub struct DwarfAbbrev(pub *mut RzBinDwarfAbbrev);
 
 impl DwarfAbbrev {
     pub fn new(input: &[u8]) -> Result<DwarfAbbrev, ()> {
@@ -64,7 +79,7 @@ impl DwarfAbbrev {
             if abbrev.is_null() {
                 return Err(());
             }
-            Ok(DwarfAbbrev { inner: abbrev })
+            Ok(DwarfAbbrev(abbrev))
         }
     }
 }
@@ -72,7 +87,7 @@ impl DwarfAbbrev {
 impl Drop for DwarfAbbrev {
     fn drop(&mut self) {
         unsafe {
-            rz_bin_dwarf_abbrev_free(self.inner);
+            rz_bin_dwarf_abbrev_free(self.0);
         }
     }
 }
