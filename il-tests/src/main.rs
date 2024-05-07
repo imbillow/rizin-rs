@@ -1,70 +1,76 @@
-use std::collections::HashMap;
+use std::cmp::min;
 use std::error::Error;
+use std::fmt;
 use std::fmt::{Display, Formatter};
+use std::sync::{Arc, Mutex};
 
+use dashmap::DashMap;
 use hex::ToHex;
 
-use rizin_rs::wrapper::Core;
+use rizin_rs::wrapper::{AnalysisOp, Core};
 
 struct Instruction {
-    addr: usize,
     bytes: Vec<u8>,
-    inst: String,
-    operands: Option<String>,
-    il: String,
+    mnemonic: String,
+    op: AnalysisOp,
 }
 
 impl Instruction {
     fn from_bytes(core: &Core, bytes: &[u8], addr: usize) -> Result<Self, ()> {
         let op = core.analysis_op(bytes, addr)?;
         let mnemonic = op.mnemonic()?;
-        let ms = mnemonic.split_once(' ');
-        Ok(Self {
-            addr,
-            bytes: Vec::from(bytes),
-            inst: ms.map_or(mnemonic.to_string(), |(a, _)| a.to_string()),
-            operands: ms.map_or(None, |(_, b)| Some(b.to_string())),
-            il: op.il_str(false)?,
-        })
+        match mnemonic.split_whitespace().next() {
+            None => Err(()),
+            Some(m) => Ok(Self {
+                bytes: Vec::from(bytes),
+                mnemonic: m.to_string(),
+                op,
+            }),
+        }
     }
 }
 
 impl Display for Instruction {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if let Some(operands) = &self.operands {
-            write!(f, "d \"{} {}\" ", self.inst, operands)?;
-        } else {
-            write!(f, "d \"{}\" ", self.inst)?;
-        }
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let opstr = self.op.mnemonic().map_err(|_| fmt::Error)?;
+        let ilstr = self.op.il_str(false).map_err(|_| fmt::Error)?;
         write!(
             f,
-            "{} {:#08x} {}",
+            "{} {} {:#08x} {}",
+            opstr,
             self.bytes.encode_hex::<String>(),
-            self.addr,
-            self.il
+            self.op.0.addr,
+            ilstr
         )
     }
 }
 
+const INST_LIMIT: usize = 0x8_usize;
+const MAX: u32 = u32::MAX as _;
+const ADDRS: [usize; 2] = [0, 0xff00];
+
 fn main() -> Result<(), Box<dyn Error>> {
-    const INST_LIMIT: usize = 0x8_usize;
-    const MAX: u32 = u32::MAX as _;
-    let mut map = HashMap::<String, usize>::new();
-
-    let core = Core::new();
-    core.set("analysis.arch", "pic").unwrap();
-    core.set("analysis.cpu", "pic18").unwrap();
-    let addrs = vec![0, 0xff00];
-
-    for x in 0..MAX {
+    let n = MAX / (rayon::current_num_threads() as u32);
+    let map = Arc::new(DashMap::<String, usize>::new());
+    let core = Arc::new(Mutex::new({
+        let core = Core::new();
+        core.set("analysis.arch", "pic").unwrap();
+        core.set("analysis.cpu", "pic18").unwrap();
+        core
+    }));
+    let runner = |core: Arc<Mutex<Core>>, map: Arc<DashMap<String, usize>>, x: u32| {
         let b: [u8; 4] = x.to_le_bytes();
-        for addr in addrs.clone() {
-            let inst = Instruction::from_bytes(&core, &b, addr);
+        for addr in ADDRS {
+            let inst = {
+                let core = core.lock().unwrap();
+                Instruction::from_bytes(&core, &b, addr)
+            };
             if inst.is_err() {
                 continue;
             }
             let inst = inst.unwrap();
-            match map.get(&inst.inst) {
+            let entry = map.get_mut(&inst.mnemonic);
+            match entry {
                 Some(x) if *x > INST_LIMIT => {
                     continue;
                 }
@@ -72,15 +78,24 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
 
             println!("{}", inst);
-            match map.get_mut(&inst.inst) {
+            match entry {
                 None => {
-                    map.insert(inst.inst, 1);
+                    map.insert(inst.mnemonic, 1);
                 }
-                Some(k) => {
+                Some(mut k) => {
                     *k += 1;
                 }
             }
         }
-    }
+    };
+
+    let pool = rayon::ThreadPoolBuilder::new().build()?;
+    pool.spawn_broadcast(move |ctx| {
+        let begin: u32 = (ctx.index() as u32) * n;
+        for x in begin..min(begin + n, MAX) {
+            runner(core.clone(), map.clone(), x);
+        }
+    });
+    pool.broadcast(|_| {});
     Ok(())
 }

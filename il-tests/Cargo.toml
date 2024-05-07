@@ -4,7 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+dashmap = "5.5.3"
 hex = "0.4.3"
+rayon = "1.10.0"
 
 [dependencies.rizin-rs]
 path = ".."

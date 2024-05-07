@@ -8,6 +8,8 @@ use std::ptr::{addr_of, addr_of_mut, null_mut};
 use crate::*;
 
 pub struct Core(pub Box<RzCore>);
+unsafe impl Sync for Core {}
+unsafe impl Send for Core {}
 
 impl Drop for Core {
     fn drop(&mut self) {
