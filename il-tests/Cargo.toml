@@ -1,0 +1,10 @@
+[package]
+name = "il-tests"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+hex-slice = "0.1.4"
+
+[dependencies.rizin-rs]
+path = ".."
