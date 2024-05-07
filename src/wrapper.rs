@@ -1,4 +1,4 @@
-use std::ffi::CString;
+use std::ffi::{CStr, CString, NulError};
 use std::mem::size_of;
 use std::path::PathBuf;
 use std::ptr;
@@ -8,18 +8,64 @@ use crate::*;
 
 pub struct Core(pub Box<RzCore>);
 
-impl Core {
-    pub fn new() -> Self {
-        unsafe { Self(Box::from_raw(rz_core_new())) }
-    }
-}
-
 impl Drop for Core {
     fn drop(&mut self) {
         let ptr = Box::into_raw(self.0.clone());
         unsafe {
             rz_core_free(ptr);
         }
+    }
+}
+pub struct AnalysisOp(pub RzAnalysisOp);
+
+impl Drop for AnalysisOp {
+    fn drop(&mut self) {
+        unsafe {
+            rz_analysis_op_fini(ptr::addr_of_mut!(self.0));
+        }
+    }
+}
+
+impl AnalysisOp {
+    pub fn mnemonic(&self) -> &CStr {
+        unsafe { CStr::from_ptr(self.0.mnemonic) }
+    }
+}
+
+impl Core {
+    pub fn new() -> Self {
+        unsafe { Self(Box::from_raw(rz_core_new())) }
+    }
+
+    pub fn analysis_op(&self, bytes: &[u8], addr: usize) -> Result<AnalysisOp, ()> {
+        let mut op: RzAnalysisOp = RzAnalysisOp::default();
+        let res = unsafe {
+            rz_analysis_op(
+                self.0.analysis,
+                ptr::addr_of_mut!(op),
+                addr as _,
+                bytes.as_ptr() as _,
+                bytes.len() as _,
+                RzAnalysisOpMask_RZ_ANALYSIS_OP_MASK_DISASM
+                    | RzAnalysisOpMask_RZ_ANALYSIS_OP_MASK_IL,
+            )
+        };
+        if res <= 0 {
+            Err(())
+        } else {
+            Ok(AnalysisOp(op))
+        }
+    }
+
+    pub fn set(&self, k: &str, v: &str) -> Result<(), NulError> {
+        unsafe {
+            rz_config_set(
+                self.0.config,
+                CString::new(k)?.as_ptr(),
+                CString::new(v)?.as_ptr(),
+            );
+        }
+        Ok(())
     }
 }
 
