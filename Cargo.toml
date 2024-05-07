@@ -7,12 +7,8 @@ exclude = ["rizin/*"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[dependencies]
-arbitrary = { version = "1", features = ["derive"] }
-
 [build-dependencies]
-# bindgen = "0.69.4"
-bindgen = { git = "https://github.com/rust-lang/rust-bindgen.git", branch = "main" }
+bindgen = "0.69.4"
 
 [profile.dev]
 rpath = true
