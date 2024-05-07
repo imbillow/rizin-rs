@@ -49,8 +49,9 @@ impl Display for Instruction {
 
 fn main() -> Result<(), Box<dyn Error>> {
     const INST_LIMIT: usize = 0x8_usize;
+    const MAX: u32 = u32::MAX;
     let map = CHashMap::<String, usize>::new();
-    let n = u32::MAX / (rayon::current_num_threads() as u32);
+    let n = MAX / (rayon::current_num_threads() as u32);
 
     let pool = rayon::ThreadPoolBuilder::new().build()?;
     pool.spawn_broadcast(move |ctx| {
@@ -60,7 +61,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let addrs = vec![0, 0xff00];
         let begin: u32 = (ctx.index() as u32) * n;
 
-        for x in begin..min(begin + n, u32::MAX) {
+        for x in begin..min(begin + n, MAX) {
             let b: [u8; 4] = x.to_le_bytes();
             for addr in addrs.clone() {
                 let inst = Instruction::from_bytes(&core, &b, addr);
@@ -68,13 +69,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                     continue;
                 }
                 let inst = inst.unwrap();
-                {
-                    if let Some(x) = map.get(&inst.inst) {
-                        if *x > INST_LIMIT {
-                            continue;
-                        }
+                match map.get(&inst.inst) {
+                    Some(x) if *x > INST_LIMIT => {
+                        continue;
                     }
+                    _ => {}
                 }
+
                 println!("{}", inst);
                 match map.get_mut(&inst.inst) {
                     None => {

@@ -42,12 +42,16 @@ impl StrBuf {
 
 impl Display for StrBuf {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let cstr = unsafe {
-            let ptr = rz_strbuf_drain_nofree(addr_of!(self.0) as _);
-            CStr::from_ptr(ptr)
-        };
-        let str = cstr.to_str().map_err(|_| fmt::Error)?;
-        f.write_str(str)
+        let cptr = unsafe { rz_strbuf_drain_nofree(addr_of!(self.0) as _) };
+        if cptr.is_null() {
+            Ok(())
+        } else {
+            let cstr = unsafe { CStr::from_ptr(cptr) };
+            match cstr.to_str() {
+                Ok(str) => f.write_str(str),
+                Err(_) => Ok(()),
+            }
+        }
     }
 }
 
@@ -84,15 +88,19 @@ impl AnalysisOp {
 
 impl Core {
     pub fn new() -> Self {
-        unsafe { Self(Box::from_raw(rz_core_new())) }
+        let core = unsafe { rz_core_new() };
+        if core.is_null() {
+            panic!("memory");
+        }
+        unsafe { Self(Box::from_raw(core)) }
     }
 
     pub fn analysis_op(&self, bytes: &[u8], addr: usize) -> Result<AnalysisOp, ()> {
-        let mut op: RzAnalysisOp = RzAnalysisOp::default();
+        let mut op: AnalysisOp = AnalysisOp(Default::default());
         let res = unsafe {
             rz_analysis_op(
                 self.0.analysis,
-                addr_of_mut!(op),
+                addr_of_mut!(op.0),
                 addr as _,
                 bytes.as_ptr() as _,
                 bytes.len() as _,
@@ -103,7 +111,7 @@ impl Core {
         if res <= 0 {
             Err(())
         } else {
-            Ok(AnalysisOp(op))
+            Ok(op)
         }
     }
 
