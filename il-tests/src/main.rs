@@ -19,6 +19,7 @@ impl Instruction {
     fn from_bytes(core: &Core, bytes: &[u8], addr: usize) -> Result<Self, ()> {
         let op = core.analysis_op(bytes, addr)?;
         let mnemonic = op.mnemonic()?;
+        let bytes = &bytes[0..op.0.size as usize];
         match mnemonic.split_whitespace().next() {
             None => Err(()),
             Some(m) => Ok(Self {
@@ -32,21 +33,21 @@ impl Instruction {
 
 impl Display for Instruction {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let opstr = self.op.mnemonic().map_err(|_| fmt::Error)?;
-        let ilstr = self.op.il_str(false).map_err(|_| fmt::Error)?;
+        let op_str = self.op.mnemonic().map_err(|_| fmt::Error)?;
+        let il_str = self.op.il_str(false).map_err(|_| fmt::Error)?;
         write!(
             f,
-            "{} {} {:#08x} {}",
-            opstr,
+            "d \"{}\" {} {:#08x} {}",
+            op_str,
             self.bytes.encode_hex::<String>(),
             self.op.0.addr,
-            ilstr
+            il_str
         )
     }
 }
 
 const INST_LIMIT: usize = 0x8_usize;
-const MAX: u32 = u32::MAX as _;
+const MAX: u32 = u16::MAX as _;
 const ADDRS: [usize; 2] = [0, 0xff00];
 
 fn main() -> Result<(), Box<dyn Error>> {
