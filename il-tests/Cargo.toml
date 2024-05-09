@@ -2,6 +2,8 @@
 name = "il-tests"
 version = "0.1.0"
 edition = "2021"
+license = "LGPL-3.0-only"
+description = "Rizin's asm and il test generator"
 
 [dependencies]
 dashmap = "5.5.3"
