@@ -1,3 +1,4 @@
+#![feature(non_null_convenience)]
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
@@ -8,10 +9,10 @@ pub mod wrapper;
 
 #[cfg(test)]
 mod tests {
-    use crate::wrapper::Core;
-    use crate::*;
     use std::ffi::CString;
     use std::path::Path;
+
+    use crate::*;
 
     #[test]
     fn test_bin_file() {
@@ -30,11 +31,6 @@ mod tests {
                 assert!(!bf.is_null());
             }
         }
-    }
-
-    #[test]
-    fn test_core() {
-        let _ = Core::new();
     }
 
     #[test]

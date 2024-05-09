@@ -89,6 +89,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/",
         ])
         .derive_default(true)
+        .generate_inline_functions(true)
         .blocklist_type("u128")
         .blocklist_type("max_align_t")
         .blocklist_function("_.*")
