@@ -36,12 +36,19 @@ jobs:
         rustup toolchain install nightly --profile minimal
         rustup default nightly
     - uses: actions/checkout@v4
+      with:
+        path: rizin-rs
     - uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: "rizin-rs -> target"
+        cache-all-crates: "true"
     - name: Build
+      working-directory: rizin-rs
       run: |
         export LD_LIBRARY_PATH=${HOME}/.local/lib/$(uname -m)-linux-gnu:${HOME}/.local/lib:${HOME}/.local/lib64:${LD_LIBRARY_PATH}
         cargo build --verbose
     - name: Run tests
+      working-directory: rizin-rs
       run: |
         export LD_LIBRARY_PATH=${HOME}/.local/lib/$(uname -m)-linux-gnu:${HOME}/.local/lib:${HOME}/.local/lib64:${LD_LIBRARY_PATH}
         cargo test --verbose
