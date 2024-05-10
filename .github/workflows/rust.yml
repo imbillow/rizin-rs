@@ -15,6 +15,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Check rizin
+      uses: actions/checkout@master
+      with:
+        repository: rizinorg/rizin
+        ref: refs/heads/dev
+        path: rizin
+    - name: Build rizin
+      run: |
+        cd rizin
+        pip install meson
+        meson setup --debug --buildtype=release --prefix=(realpath $HOME/.local) build
+        ninja install -C build
     - uses: actions/checkout@v4
     - name: Build
       run: cargo build --verbose

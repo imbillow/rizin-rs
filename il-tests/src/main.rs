@@ -47,25 +47,22 @@ impl Display for Instruction {
 }
 
 const INST_LIMIT: usize = 0x8_usize;
-const MAX: u32 = u16::MAX as _;
+const MAX: u32 = u32::MAX;
 const ADDRS: [usize; 2] = [0, 0xff00];
 
 fn main() -> Result<(), Box<dyn Error>> {
     let n = MAX / (rayon::current_num_threads() as u32);
     let map = Arc::new(DashMap::<String, usize>::new());
-    let core = Arc::new(Mutex::new({
+    let core = Arc::new({
         let core = Core::new();
         core.set("analysis.arch", "pic").unwrap();
         core.set("analysis.cpu", "pic18").unwrap();
         core
-    }));
-    let runner = |core: Arc<Mutex<Core>>, map: Arc<DashMap<String, usize>>, x: u32| {
+    });
+    let runner = |core: Arc<Core>, map: Arc<DashMap<String, usize>>, x: u32| {
         let b: [u8; 4] = x.to_le_bytes();
         for addr in ADDRS {
-            let inst = {
-                let core = core.lock().unwrap();
-                Instruction::from_bytes(&core, &b, addr)
-            };
+            let inst = { Instruction::from_bytes(&core, &b, addr) };
             if inst.is_err() {
                 continue;
             }
