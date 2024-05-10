@@ -20,16 +20,16 @@ jobs:
       with:
         repository: rizinorg/rizin
         ref: refs/heads/dev
-        path: ${{ github.workspace }}/../rizin
+        path: ${{ github.workspace }}/rizin
     - name: Cache rizin
       id: cache-rizin
       uses: actions/cache@v4
       with:
-        path: ${{ github.workspace }}/../rizin/build
+        path: ${{ github.workspace }}/rizin/build
         key: ${{ runner.os }}-rizin
         save-always: true
     - name: Build rizin
-      working-directory: ${{ github.workspace }}/../rizin
+      working-directory: ${{ github.workspace }}/rizin
       run: |
         pip install meson ninja PyYAML
         meson setup --debug --buildtype=release --prefix=$(realpath $HOME/.local) build
