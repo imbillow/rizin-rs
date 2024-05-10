@@ -23,11 +23,10 @@ jobs:
         path: rizin
     - name: Cache rizin
       id: cache-rizin
-      uses: actions/cache@v3
+      uses: actions/cache@v2
       with:
         path: rizin/build
         key: ${{ runner.os }}-rizin
-        save-always: true
     - name: Build rizin
       working-directory: rizin
       run: |
