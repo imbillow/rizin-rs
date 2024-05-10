@@ -29,8 +29,8 @@ jobs:
         key: ${{ runner.os }}-rizin
         save-always: true
     - name: Build rizin
+      working-directory: ${{ github.workspace }}/../rizin
       run: |
-        cd rizin
         pip install meson ninja PyYAML
         meson setup --debug --buildtype=release --prefix=$(realpath $HOME/.local) build
         ninja install -C build
