@@ -27,6 +27,9 @@ jobs:
         pip install meson ninja PyYAML
         meson setup --debug --buildtype=release --prefix=$(realpath $HOME/.local) build
         ninja install -C build
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: nightly
     - uses: actions/checkout@v4
     - name: Build
       run: cargo build --verbose
