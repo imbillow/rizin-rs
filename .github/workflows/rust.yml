@@ -25,7 +25,7 @@ jobs:
       run: |
         cd rizin
         pip install meson
-        meson setup --debug --buildtype=release --prefix=(realpath $HOME/.local) build
+        meson setup --debug --buildtype=release --prefix=$(realpath $HOME/.local) build
         ninja install -C build
     - uses: actions/checkout@v4
     - name: Build
