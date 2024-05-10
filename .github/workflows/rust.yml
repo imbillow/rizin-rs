@@ -41,9 +41,9 @@ jobs:
     - uses: Swatinem/rust-cache@v2
     - name: Build
       run: |
-        export LD_LIBRARY_PATH=${HOME}/lib/$(uname -m)-linux-gnu:${HOME}/lib:${HOME}/lib64:${LD_LIBRARY_PATH}
+        export LD_LIBRARY_PATH=${HOME}/.local/lib/$(uname -m)-linux-gnu:${HOME}/.local/lib:${HOME}/.local/lib64:${LD_LIBRARY_PATH}
         cargo build --verbose
     - name: Run tests
       run: |
-        export LD_LIBRARY_PATH=${HOME}/lib/$(uname -m)-linux-gnu:${HOME}/lib:${HOME}/lib64:${LD_LIBRARY_PATH}
+        export LD_LIBRARY_PATH=${HOME}/.local/lib/$(uname -m)-linux-gnu:${HOME}/.local/lib:${HOME}/.local/lib64:${LD_LIBRARY_PATH}
         cargo test --verbose
