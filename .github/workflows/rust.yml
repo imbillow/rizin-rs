@@ -24,7 +24,7 @@ jobs:
     - name: Build rizin
       run: |
         cd rizin
-        pip install meson
+        pip install meson ninja PyYAML
         meson setup --debug --buildtype=release --prefix=$(realpath $HOME/.local) build
         ninja install -C build
     - uses: actions/checkout@v4
