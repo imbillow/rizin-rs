@@ -21,23 +21,16 @@ jobs:
         repository: rizinorg/rizin
         ref: refs/heads/dev
         path: rizin
-    - uses: actions/cache/restore@v4
-      id: cache-rizin
+    - name: ccache
+      uses: hendrikmuhs/ccache-action@v1.2
       with:
-        path: |
-          rizin/build
-        key: ${{ runner.os }}-rizin
+        create-symlink: true
     - name: Build rizin
       working-directory: rizin
       run: |
         pip install meson ninja PyYAML
         meson setup --debug --buildtype=release --prefix=$(realpath $HOME/.local) build
         ninja install -C build
-    - uses: actions/cache/save@v4
-      with:
-        path: |
-          rizin/build
-        key: ${{ steps.cache-rizin.outputs.cache-primary-key }}
     - name: Setup Rust nightly
       run: |
         rustup toolchain install nightly --profile minimal
