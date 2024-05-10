@@ -20,13 +20,14 @@ jobs:
       with:
         repository: rizinorg/rizin
         ref: refs/heads/dev
-        path: rizin
+        path: ${{ GITHUB_WORKSPACE }}/../rizin
     - name: Cache rizin
       id: cache-rizin
       uses: actions/cache@v4
       with:
-        path: rizin/build
+        path: ${{ GITHUB_WORKSPACE }}/../rizin/build
         key: ${{ runner.os }}-rizin
+        save-always: true
     - name: Build rizin
       run: |
         cd rizin
