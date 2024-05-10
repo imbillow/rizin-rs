@@ -20,20 +20,25 @@ jobs:
       with:
         repository: rizinorg/rizin
         ref: refs/heads/dev
-        path: ${{ github.workspace }}/rizin
+        path: rizin
     - name: Cache rizin
       id: cache-rizin
-      uses: actions/cache@v4
+      uses: actions/cache@v3
       with:
-        path: ${{ github.workspace }}/rizin/build
+        path: rizin/build
         key: ${{ runner.os }}-rizin
         save-always: true
     - name: Build rizin
-      working-directory: ${{ github.workspace }}/rizin
+      working-directory: rizin
       run: |
         pip install meson ninja PyYAML
         meson setup --debug --buildtype=release --prefix=$(realpath $HOME/.local) build
         ninja install -C build
+    - if: ${{ steps.cache-rizin.outputs.cache-hit != 'true' }}
+      working-directory: rizin
+      name: List the state
+      continue-on-error: true
+      run: ls build
     - name: Setup Rust nightly
       run: |
         rustup toolchain install nightly --profile minimal
