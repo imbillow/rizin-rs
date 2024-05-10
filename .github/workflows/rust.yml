@@ -33,7 +33,10 @@ jobs:
         pip install meson ninja PyYAML
         meson setup --debug --buildtype=release --prefix=$(realpath $HOME/.local) build
         ninja install -C build
-    - run: rustup toolchain install nightly --profile minimal
+    - name: Setup Rust nightly
+      run: |
+        rustup toolchain install nightly --profile minimal
+        rustup default nightly
     - uses: actions/checkout@v4
     - uses: Swatinem/rust-cache@v2
     - name: Build
