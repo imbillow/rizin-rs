@@ -2,7 +2,7 @@ use std::cmp::min;
 use std::error::Error;
 use std::fmt;
 use std::fmt::{Display, Formatter};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use dashmap::DashMap;
 use hex::ToHex;

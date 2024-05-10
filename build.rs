@@ -1,8 +1,14 @@
+#![feature(iter_collect_into)]
+
+use crate::common::search_libs;
 use bindgen::callbacks::{MacroParsingBehavior, ParseCallbacks};
 use std::collections::HashSet;
 use std::env;
 use std::error::Error;
 use std::path::PathBuf;
+
+#[path = "build/common.rs"]
+pub mod common;
 
 const IGNORE_MACROS: [&str; 20] = [
     "FE_DIVBYZERO",
@@ -63,22 +69,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("cargo:rustc-link-lib=dylib={}", lib);
     }
 
-    let rizin_dir = PathBuf::from(env::var("HOME")?).join(".local");
-    let lib_dir = rizin_dir.join("lib64");
-    if lib_dir.exists() {
-        println!("cargo:rustc-link-search={}", lib_dir.to_str().unwrap());
-    }
-    let lib_dir = rizin_dir.join("lib");
-    if lib_dir.exists() {
-        println!("cargo:rustc-link-search={}", lib_dir.to_str().unwrap());
-    }
-
+    let (lib_dir, _, _) = search_libs(RZ_LIBRARIES, "RIZIN_DIR")?;
+    println!("cargo:rustc-link-search={}", lib_dir.to_str().unwrap());
     println!("cargo:rerun-if-changed=wrapper.h");
 
-    let inc_dir = rizin_dir.join("include");
-    let bindings = bindgen::Builder::default()
-        .header("wrapper.h")
-        .clang_args([
+    let builder = bindgen::Builder::default().header("wrapper.h");
+    let builder = if let Ok(dir) = env::var("RIZIN_DIR").or(env::var("HOME")) {
+        let rizin_dir = PathBuf::from(dir).join(".local");
+        let inc_dir = rizin_dir.join("include");
+        builder.clang_args([
             "-I",
             inc_dir.to_str().unwrap(),
             "-I",
@@ -88,6 +87,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             "-I",
             "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/",
         ])
+    } else {
+        builder
+    };
+
+    let bindings = builder
         .derive_default(true)
         .generate_inline_functions(true)
         .blocklist_type("u128")
