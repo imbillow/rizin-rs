@@ -1,9 +1,9 @@
 use std::cmp::min;
 use std::error::Error;
-use std::fmt;
-use std::fmt::{Display, Formatter};
-use std::sync::Arc;
+use std::fmt::Display;
+use std::sync::{Arc, Mutex};
 
+use clap::Parser;
 use dashmap::DashMap;
 use hex::ToHex;
 
@@ -31,67 +31,90 @@ impl Instruction {
     }
 }
 
-impl Display for Instruction {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let op_str = self.op.mnemonic().map_err(|_| fmt::Error)?;
-        let il_str = self.op.il_str(false).map_err(|_| fmt::Error)?;
-        write!(
-            f,
+impl Instruction {
+    fn try_to_string(&self) -> rizin_rs::wrapper::Result<String> {
+        let op_str = self.op.mnemonic()?;
+        let il_str = self.op.il_str(false)?;
+        Ok(format!(
             "d \"{}\" {} {:#08x} {}",
             op_str,
             self.bytes.encode_hex::<String>(),
             self.op.0.addr,
             il_str
-        )
+        ))
     }
 }
 
+/// Simple program to greet a person
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    #[arg(short, long, default_value = "pic")]
+    arch: String,
+
+    #[arg(short, long, default_value = "pic18")]
+    cpu: String,
+
+    #[arg(short, long)]
+    max: Option<u32>,
+}
+
 const INST_LIMIT: usize = 0x8_usize;
-const MAX: u32 = u32::MAX;
 const ADDRS: [usize; 2] = [0, 0xff00];
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let n = MAX / (rayon::current_num_threads() as u32);
+    let args = Args::parse();
+    let max = args.max.unwrap_or(u16::MAX as _);
+
+    let n = max / (rayon::current_num_threads() as u32);
     let map = Arc::new(DashMap::<String, usize>::new());
     let core = Arc::new({
         let core = Core::new();
-        core.set("analysis.arch", "pic").unwrap();
-        core.set("analysis.cpu", "pic18").unwrap();
-        core
+        core.set("analysis.arch", &args.arch).unwrap();
+        core.set("analysis.cpu", &args.cpu).unwrap();
+        core.set("asm.cpu", &args.cpu).unwrap();
+        Mutex::new(core)
     });
-    let runner = |core: Arc<Core>, map: Arc<DashMap<String, usize>>, x: u32| {
-        let b: [u8; 4] = x.to_le_bytes();
-        for addr in ADDRS {
-            let inst = { Instruction::from_bytes(&core, &b, addr) };
-            if inst.is_err() {
-                continue;
-            }
-            let inst = inst.unwrap();
-            let entry = map.get_mut(&inst.mnemonic);
-            match entry {
-                Some(x) if *x > INST_LIMIT => {
+    let runner =
+        |core: Arc<Mutex<Core>>, map: Arc<DashMap<String, usize>>, x: u32| -> Result<(), _> {
+            let b: [u8; 4] = x.to_le_bytes();
+            for addr in ADDRS {
+                let inst = {
+                    let core = core.lock().map_err(|_| ())?;
+                    Instruction::from_bytes(&core, &b, addr)
+                };
+                if inst.is_err() {
                     continue;
                 }
-                _ => {}
-            }
+                let inst = inst.unwrap();
+                let entry = map.get_mut(&inst.mnemonic);
+                match entry {
+                    Some(x) if *x > INST_LIMIT => {
+                        continue;
+                    }
+                    _ => {}
+                }
 
-            println!("{}", inst);
-            match entry {
-                None => {
-                    map.insert(inst.mnemonic, 1);
-                }
-                Some(mut k) => {
-                    *k += 1;
+                if let Ok(inst_str) = inst.try_to_string() {
+                    println!("{}", inst_str);
+                    match entry {
+                        None => {
+                            map.insert(inst.mnemonic, 1);
+                        }
+                        Some(mut k) => {
+                            *k += 1;
+                        }
+                    }
                 }
             }
-        }
-    };
+            Ok::<(), ()>(())
+        };
 
     let pool = rayon::ThreadPoolBuilder::new().build()?;
     pool.spawn_broadcast(move |ctx| {
         let begin: u32 = (ctx.index() as u32) * n;
-        for x in begin..min(begin + n, MAX) {
-            runner(core.clone(), map.clone(), x);
+        for x in begin..min(begin + n, max) {
+            let _ = runner(core.clone(), map.clone(), x);
         }
     });
     pool.broadcast(|_| {});

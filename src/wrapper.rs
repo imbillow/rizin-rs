@@ -9,7 +9,7 @@ use std::{fmt, result, slice};
 
 use crate::*;
 
-type Result<T> = result::Result<T, ()>;
+pub type Result<T> = result::Result<T, ()>;
 
 pub struct Core(pub NonNull<RzCore>);
 unsafe impl Sync for Core {}

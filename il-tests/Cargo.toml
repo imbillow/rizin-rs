@@ -6,6 +6,7 @@ license = "LGPL-3.0-only"
 description = "Rizin's asm and il test generator"
 
 [dependencies]
+clap = { version = "4.5.4", features = ["derive"] }
 dashmap = "5.5.3"
 hex = "0.4.3"
 rayon = "1.10.0"
