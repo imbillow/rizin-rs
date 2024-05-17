@@ -1,6 +1,5 @@
 use std::cmp::min;
 use std::error::Error;
-use std::fmt::Display;
 use std::sync::{Arc, Mutex};
 
 use clap::Parser;
@@ -105,6 +104,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                             *k += 1;
                         }
                     }
+                } else {
+                    eprintln!("Failed {}", b.encode_hex::<String>());
                 }
             }
             Ok::<(), ()>(())

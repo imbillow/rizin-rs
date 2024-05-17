@@ -373,7 +373,7 @@ impl<T> DerefMut for PVector<T> {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use crate::wrapper::*;
     use std::mem::size_of;
 
