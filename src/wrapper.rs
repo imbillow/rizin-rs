@@ -22,6 +22,7 @@ impl Drop for Core {
         }
     }
 }
+
 pub struct AnalysisOp(pub RzAnalysisOp);
 
 impl Drop for AnalysisOp {
@@ -114,7 +115,7 @@ impl Core {
         }
     }
 
-    pub fn set(&self, k: &str, v: &str) -> Result<NonNull<RzConfigNode>> {
+    pub fn set(&self, k: &str, v: &str) -> Result<&Self> {
         let node = unsafe {
             rz_config_set(
                 self.0.as_ref().config,
@@ -122,7 +123,7 @@ impl Core {
                 CString::new(v).map_err(|_| ())?.as_ptr(),
             )
         };
-        NonNull::new(node).ok_or(())
+        NonNull::new(node).map(|_| self).ok_or(())
     }
 }
 
