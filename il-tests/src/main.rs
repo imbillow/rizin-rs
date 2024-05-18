@@ -1,16 +1,16 @@
-use std::cmp::min;
 use std::error::Error;
-use std::sync::{Arc, Mutex};
+use std::rc::Rc;
 
 use clap::Parser;
 use dashmap::DashMap;
 use hex::ToHex;
+use itertools::Itertools;
 
 use rizin_rs::wrapper::{AnalysisOp, Core};
 
 struct Instruction {
     bytes: Vec<u8>,
-    mnemonic: String,
+    mnemonic: Rc<String>,
     op: AnalysisOp,
 }
 
@@ -23,7 +23,7 @@ impl Instruction {
             None => Err(()),
             Some(m) => Ok(Self {
                 bytes: Vec::from(bytes),
-                mnemonic: m.to_string(),
+                mnemonic: Rc::new(m.to_string()),
                 op,
             }),
         }
@@ -65,59 +65,47 @@ fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
     let max = args.max.unwrap_or(u16::MAX as _);
 
-    let n = max / (rayon::current_num_threads() as u32);
-    let map = Arc::new(DashMap::<String, usize>::new());
-    let core = Arc::new({
+    let map = DashMap::<Rc<String>, usize>::new();
+    let core = {
         let core = Core::new();
         core.set("analysis.arch", &args.arch).unwrap();
         core.set("analysis.cpu", &args.cpu).unwrap();
         core.set("asm.cpu", &args.cpu).unwrap();
-        Mutex::new(core)
-    });
-    let runner =
-        |core: Arc<Mutex<Core>>, map: Arc<DashMap<String, usize>>, x: u32| -> Result<(), _> {
-            let b: [u8; 4] = x.to_le_bytes();
-            for addr in ADDRS {
-                let inst = {
-                    let core = core.lock().map_err(|_| ())?;
-                    Instruction::from_bytes(&core, &b, addr)
-                };
-                if inst.is_err() {
-                    continue;
-                }
-                let inst = inst.unwrap();
-                let entry = map.get_mut(&inst.mnemonic);
-                match entry {
-                    Some(x) if *x > INST_LIMIT => {
-                        continue;
-                    }
-                    _ => {}
-                }
+        core
+    };
 
-                if let Ok(inst_str) = inst.try_to_string() {
-                    println!("{}", inst_str);
+    let _ = (0..max)
+        .flat_map(|x| {
+            let b = x.to_le_bytes();
+            ADDRS
+                .iter()
+                .filter_map(|addr| {
+                    let inst = { Instruction::from_bytes(&core, &b, addr.clone()) };
+                    if inst.is_err() {
+                        return None;
+                    }
+                    let inst = inst.unwrap();
+                    let entry = map.get_mut(&inst.mnemonic);
+                    match entry {
+                        Some(x) if *x > INST_LIMIT => return None,
+                        _ => {}
+                    }
+
                     match entry {
                         None => {
-                            map.insert(inst.mnemonic, 1);
+                            map.insert(inst.mnemonic.clone(), 1);
                         }
                         Some(mut k) => {
                             *k += 1;
                         }
-                    }
-                } else {
-                    eprintln!("Failed {}", b.encode_hex::<String>());
-                }
-            }
-            Ok::<(), ()>(())
-        };
-
-    let pool = rayon::ThreadPoolBuilder::new().build()?;
-    pool.spawn_broadcast(move |ctx| {
-        let begin: u32 = (ctx.index() as u32) * n;
-        for x in begin..min(begin + n, max) {
-            let _ = runner(core.clone(), map.clone(), x);
-        }
-    });
-    pool.broadcast(|_| {});
+                    };
+                    Some(inst)
+                })
+                .collect::<Vec<_>>()
+        })
+        .sorted_by_key(|x| x.mnemonic.clone())
+        .for_each(|x| {
+            let _ = x.try_to_string().map(|str| println!("{}", str));
+        });
     Ok(())
 }
