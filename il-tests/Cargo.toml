@@ -11,6 +11,11 @@ dashmap = "5.5.3"
 hex = "0.4.3"
 itertools = "0.13.0"
 rayon = "1.10.0"
+sleigh-rs = "0.1.5"
 
 [dependencies.rizin-rs]
 path = ".."
+
+[build-dependencies]
+anyhow = "1.0.86"
+sleigh2rust = "0.1.6"

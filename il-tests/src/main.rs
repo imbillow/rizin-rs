@@ -5,6 +5,7 @@ use clap::Parser;
 use dashmap::DashMap;
 use hex::ToHex;
 use itertools::Itertools;
+use il_tests::gen;
 
 use rizin_rs::wrapper::{AnalysisOp, Core};
 
@@ -74,38 +75,40 @@ fn main() -> Result<(), Box<dyn Error>> {
         core
     };
 
-    let _ = (0..max)
-        .flat_map(|x| {
-            let b = x.to_le_bytes();
-            ADDRS
-                .iter()
-                .filter_map(|addr| {
-                    let inst = { Instruction::from_bytes(&core, &b, addr.clone()) };
-                    if inst.is_err() {
-                        return None;
-                    }
-                    let inst = inst.unwrap();
-                    let entry = map.get_mut(&inst.mnemonic);
-                    match entry {
-                        Some(x) if *x > INST_LIMIT => return None,
-                        _ => {}
-                    }
 
-                    match entry {
-                        None => {
-                            map.insert(inst.mnemonic.clone(), 1);
-                        }
-                        Some(mut k) => {
-                            *k += 1;
-                        }
-                    };
-                    Some(inst)
-                })
-                .collect::<Vec<_>>()
-        })
-        .sorted_by_key(|x| x.mnemonic.clone())
-        .for_each(|x| {
-            let _ = x.try_to_string().map(|str| println!("{}", str));
-        });
+
+    // let _ = (0..max)
+    //     .flat_map(|x| {
+    //         let b = x.to_le_bytes();
+    //         ADDRS
+    //             .iter()
+    //             .filter_map(|addr| {
+    //                 let inst = { Instruction::from_bytes(&core, &b, addr.clone()) };
+    //                 if inst.is_err() {
+    //                     return None;
+    //                 }
+    //                 let inst = inst.unwrap();
+    //                 let entry = map.get_mut(&inst.mnemonic);
+    //                 match entry {
+    //                     Some(x) if *x > INST_LIMIT => return None,
+    //                     _ => {}
+    //                 }
+    //
+    //                 match entry {
+    //                     None => {
+    //                         map.insert(inst.mnemonic.clone(), 1);
+    //                     }
+    //                     Some(mut k) => {
+    //                         *k += 1;
+    //                     }
+    //                 };
+    //                 Some(inst)
+    //             })
+    //             .collect::<Vec<_>>()
+    //     })
+    //     .sorted_by_key(|x| x.mnemonic.clone())
+    //     .for_each(|x| {
+    //         let _ = x.try_to_string().map(|str| println!("{}", str));
+    //     });
     Ok(())
 }
