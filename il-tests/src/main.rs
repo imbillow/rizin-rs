@@ -79,7 +79,7 @@ impl InstructionConstraint {
         let iter = self.0.iter().map(|x| match x {
             BitConstraint::Unrestrained => rng.gen_bool(0.5),
             BitConstraint::Defined(x) => *x,
-            BitConstraint::Restrained => false,
+            BitConstraint::Restrained => unreachable!(),
         });
         let data = BitVec::<u8>::from_iter(iter).as_raw_slice().into();
         data
