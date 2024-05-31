@@ -1,3 +1,3 @@
-pub mod gen {
-    include!(concat!(env!("OUT_DIR"), "/tricore.rs"));
-}
+// pub mod gen {
+//     include!(concat!(env!("OUT_DIR"), "/tricore.rs"));
+// }

@@ -21,7 +21,8 @@ doctest = false
 
 [workspace]
 members = [
-    "il-tests"
+    "il-tests",
+    "sleigh-rs",
 ]
 
 [dev-dependencies]
@@ -32,3 +33,6 @@ rand = "0.8.5"
 [[bench]]
 name = "my_benchmark"
 harness = false
+
+[dependencies]
+anyhow = "1.0.86"

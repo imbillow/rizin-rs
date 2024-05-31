@@ -1,13 +1,21 @@
+#![feature(coroutine_trait)]
+#![feature(coroutines)]
+
 use std::error::Error;
+use std::fmt;
+use std::path::PathBuf;
 use std::rc::Rc;
 
+use anyhow::{anyhow, Result};
+use bitvec::prelude::*;
 use clap::Parser;
-use dashmap::DashMap;
 use hex::ToHex;
 use itertools::Itertools;
-use il_tests::gen;
+use rand::Rng;
 
 use rizin_rs::wrapper::{AnalysisOp, Core};
+use sleigh_rs::file_to_sleigh;
+use sleigh_rs::pattern::BitConstraint;
 
 struct Instruction {
     bytes: Vec<u8>,
@@ -16,12 +24,12 @@ struct Instruction {
 }
 
 impl Instruction {
-    fn from_bytes(core: &Core, bytes: &[u8], addr: usize) -> Result<Self, ()> {
+    fn from_bytes(core: &Core, bytes: &[u8], addr: usize) -> Result<Self> {
         let op = core.analysis_op(bytes, addr)?;
         let mnemonic = op.mnemonic()?;
         let bytes = &bytes[0..op.0.size as usize];
         match mnemonic.split_whitespace().next() {
-            None => Err(()),
+            None => Err(anyhow!("Invalid")),
             Some(m) => Ok(Self {
                 bytes: Vec::from(bytes),
                 mnemonic: Rc::new(m.to_string()),
@@ -32,16 +40,24 @@ impl Instruction {
 }
 
 impl Instruction {
-    fn try_to_string(&self) -> rizin_rs::wrapper::Result<String> {
+    fn try_to_string(&self, il: bool) -> rizin_rs::wrapper::Result<String> {
+        let mut res = String::new();
         let op_str = self.op.mnemonic()?;
-        let il_str = self.op.il_str(false)?;
-        Ok(format!(
-            "d \"{}\" {} {:#08x} {}",
-            op_str,
-            self.bytes.encode_hex::<String>(),
-            self.op.0.addr,
-            il_str
-        ))
+        fmt::write(
+            &mut res,
+            format_args!(
+                "d \"{}\" {} {:#08x}",
+                op_str,
+                self.bytes.encode_hex::<String>(),
+                self.op.0.addr
+            ),
+        )?;
+
+        if il {
+            let il_str = self.op.il_str(false)?;
+            fmt::write(&mut res, format_args!(" {}", il_str))?;
+        }
+        Ok(res)
     }
 }
 
@@ -49,24 +65,46 @@ impl Instruction {
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    #[arg(short, long, default_value = "pic")]
+    #[arg(short, long, default_value = "tricore")]
     arch: String,
 
-    #[arg(short, long, default_value = "pic18")]
+    #[arg(short, long, default_value = "tricore")]
     cpu: String,
-
-    #[arg(short, long)]
-    max: Option<u32>,
 }
 
-const INST_LIMIT: usize = 0x8_usize;
-const ADDRS: [usize; 2] = [0, 0xff00];
+struct InstructionConstraint(Vec<BitConstraint>);
+
+impl InstructionConstraint {
+    fn sample_data<R: Rng + ?Sized>(&self, rng: &mut R) -> Vec<u8> {
+        let iter = self.0.iter().map(|x| match x {
+            BitConstraint::Unrestrained => rng.gen_bool(0.5),
+            BitConstraint::Defined(x) => *x,
+            BitConstraint::Restrained => false,
+        });
+        let data = BitVec::<u8>::from_iter(iter).as_raw_slice().into();
+        data
+    }
+
+    fn sample_ops<'a, R: Rng + ?Sized>(
+        &'a self,
+        core: &'a Core,
+        addr: usize,
+        rng: &'a mut R,
+        count: usize,
+    ) -> Vec<Instruction> {
+        (0..count)
+            .filter_map(|_| {
+                let data = self.sample_data(rng);
+                Instruction::from_bytes(core, &data, addr).ok()
+            })
+            .filter(|x| !x.mnemonic.to_lowercase().contains("invalid"))
+            .collect_vec()
+    }
+}
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
-    let max = args.max.unwrap_or(u16::MAX as _);
 
-    let map = DashMap::<Rc<String>, usize>::new();
     let core = {
         let core = Core::new();
         core.set("analysis.arch", &args.arch).unwrap();
@@ -75,40 +113,29 @@ fn main() -> Result<(), Box<dyn Error>> {
         core
     };
 
-
-
-    // let _ = (0..max)
-    //     .flat_map(|x| {
-    //         let b = x.to_le_bytes();
-    //         ADDRS
-    //             .iter()
-    //             .filter_map(|addr| {
-    //                 let inst = { Instruction::from_bytes(&core, &b, addr.clone()) };
-    //                 if inst.is_err() {
-    //                     return None;
-    //                 }
-    //                 let inst = inst.unwrap();
-    //                 let entry = map.get_mut(&inst.mnemonic);
-    //                 match entry {
-    //                     Some(x) if *x > INST_LIMIT => return None,
-    //                     _ => {}
-    //                 }
-    //
-    //                 match entry {
-    //                     None => {
-    //                         map.insert(inst.mnemonic.clone(), 1);
-    //                     }
-    //                     Some(mut k) => {
-    //                         *k += 1;
-    //                     }
-    //                 };
-    //                 Some(inst)
-    //             })
-    //             .collect::<Vec<_>>()
-    //     })
-    //     .sorted_by_key(|x| x.mnemonic.clone())
-    //     .for_each(|x| {
-    //         let _ = x.try_to_string().map(|str| println!("{}", str));
-    //     });
+    let p = PathBuf::from(format!(
+        "ghidra/Ghidra/Processors/{}/data/languages/{}.slaspec",
+        &args.arch, &args.cpu
+    ));
+    let sleigh = file_to_sleigh(&p)?;
+    let insttbl = sleigh.table(sleigh.instruction_table());
+    let mut rng = rand::thread_rng();
+    insttbl
+        .constructors()
+        .iter()
+        .flat_map(|ctor| {
+            // let m = ctor.display.mneumonic.as_ref().unwrap();
+            ctor.pattern
+                .pattern_bits_variants(&sleigh)
+                .flat_map(|(_, _, b)| {
+                    let x = InstructionConstraint(b);
+                    x.sample_ops(&core, 0x0, &mut rng, 3)
+                })
+                .collect_vec()
+        })
+        .sorted_by_key(|x| x.mnemonic.clone())
+        .for_each(|x| {
+            let _ = x.try_to_string(true).map(|str| println!("{}", str));
+        });
     Ok(())
 }

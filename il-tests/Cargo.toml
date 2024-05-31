@@ -11,10 +11,14 @@ dashmap = "5.5.3"
 hex = "0.4.3"
 itertools = "0.13.0"
 rayon = "1.10.0"
-sleigh-rs = "0.1.5"
+sleigh-rs = { path = "../sleigh-rs" }
+rizin-rs = { path = ".." }
+bitvec = "1.0.1"
+anyhow = "1.0.86"
+rand = "0.8.5"
+async-stream = "0.3.5"
+futures-util = "0.3.30"
 
-[dependencies.rizin-rs]
-path = ".."
 
 [build-dependencies]
 anyhow = "1.0.86"

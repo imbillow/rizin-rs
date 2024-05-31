@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use std::ffi::{CStr, CString};
 use std::fmt::Display;
 use std::marker::PhantomData;
@@ -9,7 +10,7 @@ use std::{fmt, result, slice};
 
 use crate::*;
 
-pub type Result<T> = result::Result<T, ()>;
+pub type Result<T> = anyhow::Result<T>;
 
 pub struct Core(pub NonNull<RzCore>);
 unsafe impl Sync for Core {}
@@ -69,16 +70,16 @@ impl Drop for StrBuf {
 impl AnalysisOp {
     pub fn mnemonic(&self) -> Result<&str> {
         if self.0.mnemonic.is_null() {
-            Err(())
+            Err(anyhow!("mnemonic is_null"))
         } else {
             let cstr = unsafe { CStr::from_ptr(self.0.mnemonic) };
-            cstr.to_str().map_err(|_| ())
+            cstr.to_str().map_err(|_| anyhow!("invalid cstr"))
         }
     }
 
     pub fn il_str(&self, pretty: bool) -> Result<String> {
         if self.0.il_op.is_null() {
-            Err(())
+            Err(anyhow!("il_op is null"))
         } else {
             let mut sb = StrBuf::new();
             unsafe {
@@ -109,7 +110,7 @@ impl Core {
             )
         };
         if res <= 0 {
-            Err(())
+            Err(anyhow!("failed analysis op"))
         } else {
             Ok(op)
         }
@@ -119,11 +120,13 @@ impl Core {
         let node = unsafe {
             rz_config_set(
                 self.0.as_ref().config,
-                CString::new(k).map_err(|_| ())?.as_ptr(),
-                CString::new(v).map_err(|_| ())?.as_ptr(),
+                CString::new(k)?.as_ptr(),
+                CString::new(v)?.as_ptr(),
             )
         };
-        NonNull::new(node).map(|_| self).ok_or(())
+        NonNull::new(node)
+            .map(|_| self)
+            .ok_or(anyhow!("{} is null", k))
     }
 }
 
@@ -140,7 +143,7 @@ impl Core {
         let bf = rz_bin_open(self.0.as_ref().bin, cpath.as_ptr(), &mut rz_bin_opt);
         Ok(BinFile {
             core: self,
-            bf: NonNull::new(bf).ok_or(())?,
+            bf: NonNull::new(bf).ok_or(anyhow!("failed open {}", path.to_str().unwrap()))?,
         })
     }
 }
@@ -174,7 +177,7 @@ impl DwarfAbbrev {
         let abbrev = unsafe { rz_bin_dwarf_abbrev_new(addr_of_mut!(R)) };
         NonNull::<RzBinDwarfAbbrev>::new(abbrev)
             .map(DwarfAbbrev)
-            .ok_or(())
+            .ok_or(anyhow!("failed new"))
     }
 }
 

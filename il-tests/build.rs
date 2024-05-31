@@ -19,6 +19,5 @@ fn main() {
     let x = generate_disassembler(&p).unwrap();
     let f = File::create(out_dir.join("tricore.rs")).unwrap();
     let mut w = BufWriter::new(f);
-    rust
     w.write(x.to_string().as_bytes()).unwrap();
 }
