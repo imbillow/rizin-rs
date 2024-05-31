@@ -32,9 +32,4 @@ mod tests {
             }
         }
     }
-
-    #[test]
-    fn test_none() {
-        assert!(true);
-    }
 }

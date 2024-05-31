@@ -1,6 +1,7 @@
 use rizin_rs::wrapper::Core;
+use anyhow::Result;
 
-fn main() -> Result<(), ()> {
+fn main() -> Result<()> {
     let core = Core::new();
     core.set("analysis.arch", "pic")?;
     core.set("analysis.cpu", "pic18")?;

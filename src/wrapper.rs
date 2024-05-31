@@ -1,12 +1,13 @@
-use anyhow::anyhow;
 use std::ffi::{CStr, CString};
 use std::fmt::Display;
 use std::marker::PhantomData;
-use std::mem::ManuallyDrop;
+use std::mem::{ManuallyDrop, size_of};
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use std::ptr::{addr_of, addr_of_mut, null_mut, NonNull};
 use std::{fmt, result, slice};
+
+use anyhow::anyhow;
 
 use crate::*;
 
@@ -173,8 +174,12 @@ pub struct DwarfAbbrev(pub NonNull<RzBinDwarfAbbrev>);
 
 impl DwarfAbbrev {
     pub fn new(input: &[u8]) -> Result<DwarfAbbrev> {
-        let mut R = RzBinEndianReader::new(input, false);
-        let abbrev = unsafe { rz_bin_dwarf_abbrev_new(addr_of_mut!(R)) };
+        let R = RzBinEndianReader::new(input, false);
+        let abbrev = unsafe {
+            let ptr = libc::malloc(size_of::<RzBinEndianReader>());
+            libc::memcpy(ptr, addr_of!(R) as _, size_of::<RzBinEndianReader>());
+            rz_bin_dwarf_abbrev_new(ptr as _)
+        };
         NonNull::<RzBinDwarfAbbrev>::new(abbrev)
             .map(DwarfAbbrev)
             .ok_or(anyhow!("failed new"))
@@ -378,8 +383,9 @@ impl<T> DerefMut for PVector<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::wrapper::*;
     use std::mem::size_of;
+
+    use crate::wrapper::*;
 
     #[test]
     fn test_core() {
